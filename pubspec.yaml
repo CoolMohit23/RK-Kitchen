@@ -36,6 +36,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   provider: ^6.1.2  # Added provider package for state management
   shared_preferences: ^2.2.2 # Added for local storage
+  intl: ^0.18.0  # Added for date formatting
+
 
 dev_dependencies:
   flutter_test:

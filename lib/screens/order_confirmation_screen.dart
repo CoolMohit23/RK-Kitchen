@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'order_history_screen.dart';
 
 class OrderConfirmationScreen extends StatelessWidget {
   final String customerName;
@@ -96,13 +97,28 @@ class OrderConfirmationScreen extends StatelessWidget {
               ),
               const SizedBox(height: 48),
               ElevatedButton(
-                onPressed: () {
+              onPressed: () {
                   Navigator.of(context).popUntil((route) => route.isFirst);
-                },
-                style: ElevatedButton.styleFrom(
+              },
+              style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                ),
-                child: const Text('BACK TO HOME'),
+              ),
+              child: const Text('BACK TO HOME'),
+              ),
+              // Add this below the existing button:
+              const SizedBox(height: 12), // Space between buttons
+              OutlinedButton(
+              onPressed: () {
+                  Navigator.of(context).push(
+                  MaterialPageRoute(
+                      builder: (context) => const OrderHistoryScreen(),
+                  ),
+                  );
+              },
+              style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              ),
+              child: const Text('VIEW ORDER HISTORY'),
               ),
             ],
           ),

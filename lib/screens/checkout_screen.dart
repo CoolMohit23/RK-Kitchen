@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
 import 'order_confirmation_screen.dart';
+import '../providers/orders_provider.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -205,30 +206,39 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  void _placeOrder(BuildContext context) {
+    void _placeOrder(BuildContext context) {
     setState(() {
-      _isProcessing = true;
+        _isProcessing = true;
     });
 
     // Simulate order processing delay
     Future.delayed(const Duration(seconds: 2), () {
-      final cart = Provider.of<CartProvider>(context, listen: false);
-      
-      // In a real app, you would send the order to a backend here
-      
-      // Navigate to confirmation screen
-      Navigator.of(context).pushReplacement(
+        final cart = Provider.of<CartProvider>(context, listen: false);
+        final ordersProvider = Provider.of<OrdersProvider>(context, listen: false);
+        
+        // Add order to history
+        ordersProvider.addOrder(
+        cartItems: cart.items,
+        totalAmount: cart.totalAmount,
+        customerName: _nameController.text,
+        customerPhone: _phoneController.text,
+        deliveryOption: _deliveryOption,
+        deliveryAddress: _deliveryOption == 'Delivery' ? _addressController.text : '',
+        );
+        
+        // Navigate to confirmation screen
+        Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (context) => OrderConfirmationScreen(
+            builder: (context) => OrderConfirmationScreen(
             customerName: _nameController.text,
             deliveryOption: _deliveryOption,
             totalAmount: cart.totalAmount,
-          ),
+            ),
         ),
-      );
-      
-      // Clear the cart after order is placed
-      cart.clear();
+        );
+        
+        // Clear the cart after order is placed
+        cart.clear();
     });
-  }
+    }
 }
