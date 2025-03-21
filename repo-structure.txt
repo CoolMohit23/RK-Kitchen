@@ -1,0 +1,27 @@
+rk_kitchen/
+├── .git/                  # Git repository data (auto-created)
+├── .gitignore             # Files to exclude from Git
+├── README.md              # Project documentation
+├── android/               # Android-specific code
+├── ios/                   # iOS-specific code (even if not used now)
+├── lib/                   # Main Flutter code
+│   ├── main.dart          # Entry point
+│   ├── models/            # Data models
+│   │   ├── menu_item.dart
+│   │   └── order.dart
+│   ├── screens/           # App screens
+│   │   ├── home_screen.dart
+│   │   ├── menu_screen.dart
+│   │   └── order_screen.dart
+│   ├── services/          # Backend services
+│   │   ├── firebase_service.dart
+│   │   └── sheets_service.dart
+│   └── widgets/           # Reusable components
+│       ├── menu_card.dart
+│       └── cart_item.dart
+├── assets/                # Images, fonts, etc.
+│   └── images/
+├── docs/                  # Additional documentation
+│   └── setup_guide.md
+├── pubspec.yaml           # Flutter dependencies
+└── test/                  # Unit and widget tests

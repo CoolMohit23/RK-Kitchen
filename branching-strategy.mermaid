@@ -1,0 +1,19 @@
+gitGraph
+   commit
+   branch develop
+   checkout develop
+   commit
+   branch feature/menu-display
+   checkout feature/menu-display
+   commit
+   commit
+   checkout develop
+   merge feature/menu-display
+   branch feature/order-form
+   checkout feature/order-form
+   commit
+   commit
+   checkout develop
+   merge feature/order-form
+   checkout main
+   merge develop tag:"v0.1.0"
