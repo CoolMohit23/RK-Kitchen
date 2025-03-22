@@ -48,9 +48,10 @@ android/app/release/
 **/ios/Runner/GeneratedPluginRegistrant.*
 
 # Firebase config files (contains sensitive info)
-**/android/app/google-services.json
-**/ios/Runner/GoogleService-Info.plist
-firebase_options.dart
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+lib/firebase_options.dart
+firebase.json
 
 # IDE specific files
 .idea/

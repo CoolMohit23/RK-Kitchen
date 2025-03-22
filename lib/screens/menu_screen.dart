@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/cart_provider.dart';
+import '../providers/menu_provider.dart';
 import '../models/menu_item.dart';
-import '../data/menu_data.dart';
 import 'main_screen.dart';
 
 class MenuScreen extends StatefulWidget {
@@ -14,47 +14,19 @@ class MenuScreen extends StatefulWidget {
 
 class _MenuScreenState extends State<MenuScreen> {
   String _selectedCategory = 'All';
-  late List<String> _categories;
-  late List<MenuItem> _menuItems;
-  String _searchQuery = '';
-  final TextEditingController _searchController = TextEditingController();
+  bool _isInitialized = false;
 
   @override
-  void initState() {
-    super.initState();
-    _menuItems = MenuData.getMenuItems();
-    _categories = ['All', ...MenuData.getAllCategories()];
-    _searchController.addListener(_onSearchChanged);
-  }
-
-  @override
-  void dispose() {
-    _searchController.removeListener(_onSearchChanged);
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  void _onSearchChanged() {
-    setState(() {
-      _searchQuery = _searchController.text;
-    });
-  }
-
-  List<MenuItem> get filteredItems {
-    // First filter by category
-    List<MenuItem> items = _selectedCategory == 'All'
-        ? _menuItems
-        : _menuItems.where((item) => item.category == _selectedCategory).toList();
-    
-    // Then filter by search query if it exists
-    if (_searchQuery.isNotEmpty) {
-      items = items
-          .where((item) => item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                  item.description.toLowerCase().contains(_searchQuery.toLowerCase()))
-          .toList();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Fetch menu items only once when the screen loads
+    if (!_isInitialized) {
+      // Use Future.microtask to avoid calling setState during build
+      Future.microtask(() {
+        Provider.of<MenuProvider>(context, listen: false).fetchMenuItems();
+      });
+      _isInitialized = true;
     }
-    
-    return items;
   }
 
   @override
@@ -62,140 +34,160 @@ class _MenuScreenState extends State<MenuScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Our Menu'),
-        // Removed the cart icon since it's in the bottom nav bar
       ),
-      body: Column(
-        children: [
-          // Search bar
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search menu items...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                        },
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: Colors.grey.shade200,
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
+      body: Consumer<MenuProvider>(
+        builder: (ctx, menuProvider, child) {
+          // Handle loading state
+          if (menuProvider.isLoading) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
+          
+          // Handle error state
+          if (menuProvider.error.isNotEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.error_outline,
+                    size: 60,
+                    color: Colors.red,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    menuProvider.error,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      menuProvider.fetchMenuItems();
+                    },
+                    child: const Text('Try Again'),
+                  ),
+                ],
               ),
-            ),
-          ),
+            );
+          }
           
-          // Results count
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Row(
-              children: [
-                Text(
-                  '${filteredItems.length} items',
-                  style: const TextStyle(
-                    color: Colors.grey,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          // Get the list of categories
+          final categories = menuProvider.categories;
           
-          // Menu items - Note the Expanded changed to account for bottom filters
-          Expanded(
-            child: filteredItems.isEmpty
-                ? const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.no_food,
-                          size: 64,
-                          color: Colors.grey,
-                        ),
-                        SizedBox(height: 16),
-                        Text(
-                          'No items found',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          'Try a different search or category',
-                          style: TextStyle(
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ],
+          // Get filtered items based on selected category
+          final filteredItems = menuProvider.getItemsByCategory(_selectedCategory);
+          
+          return Column(
+            children: [
+              // Results count
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Row(
+                  children: [
+                    Text(
+                      '${filteredItems.length} items',
+                      style: const TextStyle(
+                        color: Colors.grey,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16.0),
-                    itemCount: filteredItems.length,
-                    itemBuilder: (context, index) {
-                      final item = filteredItems[index];
-                      return _buildFoodItem(context, item);
-                    },
-                  ),
-          ),
-          
-          // Category filter now at the bottom
-          Container(
-            height: 60,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
-                  spreadRadius: 1,
-                  blurRadius: 10,
-                  offset: const Offset(0, -3),
+                  ],
                 ),
-              ],
-            ),
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              itemCount: _categories.length,
-              itemBuilder: (context, index) {
-                final category = _categories[index];
-                final isSelected = _selectedCategory == category;
-                
-                return Container(
-                  margin: const EdgeInsets.only(right: 8.0),
-                  child: ChoiceChip(
-                    label: Text(category),
-                    selected: isSelected,
-                    backgroundColor: Colors.grey.shade200,
-                    selectedColor: Theme.of(context).colorScheme.primary,
-                    labelStyle: TextStyle(
-                      color: isSelected ? Colors.white : Colors.black,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+              
+              // Menu items list
+              Expanded(
+                child: filteredItems.isEmpty
+                    ? const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.no_food,
+                              size: 64,
+                              color: Colors.grey,
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              'No items found',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'Try a different category',
+                              style: TextStyle(
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16.0),
+                        itemCount: filteredItems.length,
+                        itemBuilder: (context, index) {
+                          final item = filteredItems[index];
+                          return _buildFoodItem(context, item);
+                        },
+                      ),
+              ),
+              
+              // Category filter at the bottom
+              Container(
+                height: 60,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.2),
+                      spreadRadius: 1,
+                      blurRadius: 10,
+                      offset: const Offset(0, -3),
                     ),
-                    onSelected: (selected) {
-                      if (selected) {
-                        setState(() {
-                          _selectedCategory = category;
-                        });
-                      }
-                    },
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
+                  ],
+                ),
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  itemCount: categories.length,
+                  itemBuilder: (context, index) {
+                    final category = categories[index];
+                    final isSelected = _selectedCategory == category;
+                    
+                    return Container(
+                      margin: const EdgeInsets.only(right: 8.0),
+                      child: ChoiceChip(
+                        label: Text(category),
+                        selected: isSelected,
+                        backgroundColor: Colors.grey.shade200,
+                        selectedColor: Theme.of(context).colorScheme.primary,
+                        labelStyle: TextStyle(
+                          color: isSelected ? Colors.white : Colors.black,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                        onSelected: (selected) {
+                          if (selected) {
+                            setState(() {
+                              _selectedCategory = category;
+                            });
+                          }
+                        },
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -228,6 +220,14 @@ class _MenuScreenState extends State<MenuScreen> {
                   height: 100,
                   width: 100,
                   fit: BoxFit.cover,
+                  errorBuilder: (ctx, error, stackTrace) {
+                    return Container(
+                      height: 100,
+                      width: 100,
+                      color: Colors.grey.shade300,
+                      child: const Icon(Icons.restaurant, color: Colors.white),
+                    );
+                  },
                 ),
               ),
               const SizedBox(width: 12),
@@ -349,6 +349,14 @@ class _MenuScreenState extends State<MenuScreen> {
                     height: 200,
                     width: double.infinity,
                     fit: BoxFit.cover,
+                    errorBuilder: (ctx, error, stackTrace) {
+                      return Container(
+                        height: 200,
+                        width: double.infinity,
+                        color: Colors.grey.shade300,
+                        child: const Icon(Icons.restaurant, size: 64, color: Colors.white),
+                      );
+                    },
                   ),
                 ),
                 Positioned(

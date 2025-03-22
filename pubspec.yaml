@@ -38,6 +38,11 @@ dependencies:
   shared_preferences: ^2.2.2 # Added for local storage
   intl: ^0.18.0  # Added for date formatting
 
+  # Add these Firebase packages
+  firebase_core: ^2.27.0
+  cloud_firestore: ^4.15.7
+  firebase_auth: ^4.17.7  # For future authentication needs
+
 
 dev_dependencies:
   flutter_test:

@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../models/cart_item.dart';
 import 'package:intl/intl.dart';
+import '../services/firebase_service.dart';  // Add this import
 
 class Order {
   final String id;
@@ -27,7 +28,7 @@ class Order {
     this.status = 'Pending',  // Default status is Pending
   });
 
-  // Convert Order to a Map
+  // Convert Order to a Map for local storage
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -42,7 +43,21 @@ class Order {
     };
   }
 
-  // Create an Order from a Map
+  // Convert Order to a Map for Firestore
+  Map<String, dynamic> toFirestore() {
+    return {
+      'cartItems': cartItems.map((item) => item.toJson()).toList(),
+      'totalAmount': totalAmount,
+      'dateTime': dateTime.toIso8601String(),
+      'customerName': customerName,
+      'customerPhone': customerPhone,
+      'deliveryOption': deliveryOption,
+      'deliveryAddress': deliveryAddress,
+      'status': status,
+    };
+  }
+
+  // Create an Order from a Map (for local storage)
   factory Order.fromJson(Map<String, dynamic> json) {
     return Order(
       id: json['id'],
@@ -59,6 +74,23 @@ class Order {
     );
   }
 
+  // Create an Order from a Firestore document
+  factory Order.fromFirestore(String documentId, Map<String, dynamic> data) {
+    return Order(
+      id: documentId,
+      cartItems: (data['cartItems'] as List)
+          .map((item) => CartItem.fromJson(item as Map<String, dynamic>))
+          .toList(),
+      totalAmount: data['totalAmount'] as double,
+      dateTime: DateTime.parse(data['dateTime']),
+      customerName: data['customerName'],
+      customerPhone: data['customerPhone'],
+      deliveryOption: data['deliveryOption'],
+      deliveryAddress: data['deliveryAddress'],
+      status: data['status'],
+    );
+  }
+
   // Get formatted date
   String get formattedDate {
     return DateFormat('dd MMM yyyy, hh:mm a').format(dateTime);
@@ -72,6 +104,7 @@ class Order {
 
 class OrdersProvider with ChangeNotifier {
   List<Order> _orders = [];
+  final FirebaseService _firebaseService = FirebaseService();  // Add this
 
   // Getter for a copy of orders
   List<Order> get orders {
@@ -86,6 +119,7 @@ class OrdersProvider with ChangeNotifier {
   // Constructor loads orders when created
   OrdersProvider() {
     _loadOrders();
+    _listenToFirestoreOrders(); // Add this to listen for real-time updates
   }
 
   // Load orders from SharedPreferences
@@ -111,6 +145,26 @@ class OrdersProvider with ChangeNotifier {
     }
   }
 
+  // Listen to real-time updates from Firestore
+  void _listenToFirestoreOrders() {
+    _firebaseService.ordersCollection
+        .orderBy('dateTime', descending: true)
+        .snapshots()
+        .listen((snapshot) {
+      try {
+        _orders = snapshot.docs.map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          return Order.fromFirestore(doc.id, data);
+        }).toList();
+        
+        _saveOrders(); // Update local storage with Firestore data
+        notifyListeners();
+      } catch (e) {
+        print('Error listening to Firestore orders: $e');
+      }
+    });
+  }
+
   // Save orders to SharedPreferences
   Future<void> _saveOrders() async {
     try {
@@ -128,14 +182,14 @@ class OrdersProvider with ChangeNotifier {
   }
 
   // Add a new order
-  void addOrder({
+  Future<void> addOrder({
     required List<CartItem> cartItems,
     required double totalAmount,
     required String customerName,
     required String customerPhone,
     required String deliveryOption,
     required String deliveryAddress,
-  }) {
+  }) async {
     final newOrder = Order(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       cartItems: cartItems,
@@ -147,13 +201,27 @@ class OrdersProvider with ChangeNotifier {
       deliveryAddress: deliveryAddress,
     );
     
+    // Add to local list
     _orders.insert(0, newOrder); // Add new order at the beginning
+    
+    // Save to local storage
     _saveOrders();
     notifyListeners();
+    
+    // Save to Firestore
+    try {
+      await _firebaseService.ordersCollection.doc(newOrder.id).set(
+        newOrder.toFirestore(),
+      );
+    } catch (e) {
+      print('Error saving order to Firestore: $e');
+      // In a real app, you might want to show an error to the user
+      // or implement retry logic
+    }
   }
 
-  // Update order status
-  void updateOrderStatus(String orderId, String newStatus) {
+  // Update order status (now updates both local and Firestore)
+  Future<void> updateOrderStatus(String orderId, String newStatus) async {
     final orderIndex = _orders.indexWhere((order) => order.id == orderId);
     if (orderIndex >= 0) {
       final updatedOrder = Order(
@@ -168,9 +236,19 @@ class OrdersProvider with ChangeNotifier {
         status: newStatus,
       );
       
+      // Update local storage
       _orders[orderIndex] = updatedOrder;
       _saveOrders();
       notifyListeners();
+      
+      // Update Firestore
+      try {
+        await _firebaseService.ordersCollection.doc(orderId).update({
+          'status': newStatus
+        });
+      } catch (e) {
+        print('Error updating order status in Firestore: $e');
+      }
     }
   }
 
@@ -179,13 +257,34 @@ class OrdersProvider with ChangeNotifier {
     return _orders.firstWhere((order) => order.id == id, orElse: () => null as Order);
   }
 
-  // Clear all orders (for testing)
+  // Clear all orders (for testing) - now also clears from Firestore
   Future<void> clearOrders() async {
+    // Clear local storage
     _orders = [];
     
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('orders');
     
     notifyListeners();
+    
+    // Note: Be very careful with this in production!
+    // This would delete all orders for all users
+    // In a real app, you'd want to limit this to the current user's orders
+    // and probably add additional safeguards
+    
+    /* Uncomment to enable clearing from Firestore (USE WITH CAUTION)
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+      final snapshots = await _firebaseService.ordersCollection.get();
+      
+      for (var doc in snapshots.docs) {
+        batch.delete(doc.reference);
+      }
+      
+      await batch.commit();
+    } catch (e) {
+      print('Error clearing orders from Firestore: $e');
+    }
+    */
   }
 }

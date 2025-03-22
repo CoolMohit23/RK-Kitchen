@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'services/firebase_service.dart';
 import 'screens/main_screen.dart'; // Import the MainScreen
 import 'providers/cart_provider.dart';
 import 'providers/user_preferences.dart';
 import 'providers/orders_provider.dart';
+import 'providers/menu_provider.dart';
 
-void main() {
+void main() async {
+  // Ensure Flutter is initialized
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Firebase
+  await FirebaseService.initializeFirebase();
+  
   runApp(const MyApp());
 }
 
@@ -20,6 +28,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (ctx) => CartProvider()),
         ChangeNotifierProvider(create: (ctx) => UserPreferences()),
         ChangeNotifierProvider(create: (ctx) => OrdersProvider()),
+        ChangeNotifierProvider(create: (ctx) => MenuProvider()),
       ],
       child: MaterialApp(
         title: 'RK Kitchen',

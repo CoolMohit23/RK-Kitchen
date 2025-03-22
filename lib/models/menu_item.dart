@@ -15,7 +15,39 @@ class MenuItem {
     required this.category,
   });
 
-  // Convert a MenuItem to a Map (for storing in shared preferences)
+  // Convert to a Map for Firestore
+  Map<String, dynamic> toFirestore() {
+    return {
+      'name': name,
+      'description': description,
+      'price': price,
+      'imageUrl': imageUrl,
+      'category': category,
+    };
+  }
+
+  // Create a MenuItem from a Firestore document
+factory MenuItem.fromFirestore(String documentId, Map<String, dynamic> data) {
+  // Handle potential type issues with price
+  double priceValue = 0.0;
+  if (data['price'] is int) {
+    priceValue = (data['price'] as int).toDouble();
+  } else if (data['price'] is double) {
+    priceValue = data['price'] as double;
+  } else if (data['price'] is String) {
+    priceValue = double.tryParse(data['price'] as String) ?? 0.0;
+  }
+
+  return MenuItem(
+    id: documentId,
+    name: data['name'] as String? ?? 'Unknown Item',
+    description: data['description'] as String? ?? 'No description available',
+    price: priceValue,
+    imageUrl: data['imageUrl'] as String? ?? 'https://via.placeholder.com/150?text=No+Image',
+    category: data['category'] as String? ?? 'Uncategorized',
+  );
+}
+  // Keep existing methods
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -27,7 +59,6 @@ class MenuItem {
     };
   }
 
-  // Create a MenuItem from a Map (for retrieving from shared preferences)
   factory MenuItem.fromJson(Map<String, dynamic> json) {
     // Handle potential type issues with price
     double priceValue;
